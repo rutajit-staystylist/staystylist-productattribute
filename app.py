@@ -18,7 +18,7 @@ def get_meta_attributes(image_file):
         "Authorization": f"Bearer {api_key}"
     }
     payload = {
-        "model": "gpt-4-vision-preview",
+        "model": "gpt-4o",
         "messages": [
             {
                 "role": "user",
@@ -90,7 +90,7 @@ def process_images_and_generate_excel(uploaded_files, progress_bar):
     return excel_data
 
 st.title("StayStylist")
-st.header("Product Attributiion")
+st.header("Product Attribution")
 st.subheader("Instantly Detect Product Attributes from Images")
 
 uploaded_files = st.file_uploader("Choose image files", type=["png", "jpg", "jpeg"], accept_multiple_files=True)
