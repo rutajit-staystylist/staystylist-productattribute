@@ -89,7 +89,9 @@ def process_images_and_generate_excel(uploaded_files, progress_bar):
     excel_data.seek(0)
     return excel_data
 
-st.title("Dress Attribute Extractor")
+st.title("StayStylist")
+st.header("Product Attributiion")
+st.subheader("Instantly Detect Product Attributes from Images")
 
 uploaded_files = st.file_uploader("Choose image files", type=["png", "jpg", "jpeg"], accept_multiple_files=True)
 
