@@ -89,7 +89,7 @@ def process_images_and_generate_excel(uploaded_files, progress_bar):
     excel_data.seek(0)
     return excel_data
 
-st.title("StayStylist")
+st.title("Stay Stylist")
 st.header("Product Attribution")
 st.subheader("Instantly Detect Product Attributes from Images")
 
