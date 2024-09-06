@@ -1,7 +1,5 @@
 import streamlit as st
-import zipfile
 import os
-import tempfile
 import base64
 import requests
 from openpyxl import Workbook
@@ -10,12 +8,11 @@ from io import BytesIO
 # OpenAI API Key - This should be stored securely, preferably as an environment variable
 api_key = st.secrets["OPENAI_API_KEY"]
 
-def encode_image(image_path):
-    with open(image_path, "rb") as image_file:
-        return base64.b64encode(image_file.read()).decode('utf-8')
+def encode_image(image_file):
+    return base64.b64encode(image_file.read()).decode('utf-8')
 
-def get_meta_attributes(image_path):
-    base64_image = encode_image(image_path)
+def get_meta_attributes(image_file):
+    base64_image = encode_image(image_file)
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {api_key}"
@@ -45,7 +42,7 @@ def get_meta_attributes(image_path):
     response = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
     return response.json()
 
-def process_images_and_generate_excel(folder_path, progress_bar):
+def process_images_and_generate_excel(uploaded_files, progress_bar):
     wb = Workbook()
     ws = wb.active
     ws.title = "Dress Attributes"
@@ -55,18 +52,16 @@ def process_images_and_generate_excel(folder_path, progress_bar):
     ws.append(headers)
     ws_failed.append(["IMAGE_FILE_NAME"])
 
-    image_files = [f for f in os.listdir(folder_path) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
-    total_files = len(image_files)
+    total_files = len(uploaded_files)
 
-    for i, filename in enumerate(image_files):
-        image_path = os.path.join(folder_path, filename)
+    for i, file in enumerate(uploaded_files):
         try:
-            meta_attributes = get_meta_attributes(image_path)
+            meta_attributes = get_meta_attributes(file)
             if 'choices' in meta_attributes and meta_attributes['choices']:
                 content = meta_attributes['choices'][0]['message']['content']
                 attributes = content.split('\n')
 
-                attribute_values = [filename]
+                attribute_values = [file.name]
                 for header in headers[1:]:
                     found = False
                     for attribute in attributes:
@@ -80,12 +75,12 @@ def process_images_and_generate_excel(folder_path, progress_bar):
                 if any(value.strip() for value in attribute_values[1:]):
                     ws.append(attribute_values)
                 else:
-                    ws_failed.append([filename])
+                    ws_failed.append([file.name])
             else:
-                ws_failed.append([filename])
+                ws_failed.append([file.name])
         except Exception as e:
-            st.error(f"Error processing {filename}: {str(e)}")
-            ws_failed.append([filename])
+            st.error(f"Error processing {file.name}: {str(e)}")
+            ws_failed.append([file.name])
 
         progress_bar.progress((i + 1) / total_files)
 
@@ -96,20 +91,16 @@ def process_images_and_generate_excel(folder_path, progress_bar):
 
 st.title("Dress Attribute Extractor")
 
-uploaded_file = st.file_uploader("Choose a ZIP file containing images", type="zip")
+uploaded_files = st.file_uploader("Choose image files", type=["png", "jpg", "jpeg"], accept_multiple_files=True)
 
-if uploaded_file is not None:
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        with zipfile.ZipFile(uploaded_file, 'r') as zip_ref:
-            zip_ref.extractall(tmp_dir)
+if uploaded_files:
+    progress_bar = st.progress(0)
+    excel_data = process_images_and_generate_excel(uploaded_files, progress_bar)
 
-        progress_bar = st.progress(0)
-        excel_data = process_images_and_generate_excel(tmp_dir, progress_bar)
-
-        st.success("Processing complete!")
-        st.download_button(
-            label="Download Excel File",
-            data=excel_data,
-            file_name="DRESS_ATTRIBUTES.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+    st.success("Processing complete!")
+    st.download_button(
+        label="Download Excel File",
+        data=excel_data,
+        file_name="DRESS_ATTRIBUTES.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
