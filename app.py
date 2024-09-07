@@ -4,6 +4,7 @@ import base64
 import requests
 from openpyxl import Workbook
 from io import BytesIO
+import time
 
 # OpenAI API Key - This should be stored securely, preferably as an environment variable
 api_key = st.secrets["OPENAI_API_KEY"]
@@ -11,14 +12,14 @@ api_key = st.secrets["OPENAI_API_KEY"]
 def encode_image(image_file):
     return base64.b64encode(image_file.read()).decode('utf-8')
 
-def get_meta_attributes(image_file):
+def get_meta_attributes(image_file, max_retries=3):
     base64_image = encode_image(image_file)
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {api_key}"
     }
     payload = {
-        "model": "gpt-4o",
+        "model": "gpt-4-vision-preview",
         "messages": [
             {
                 "role": "user",
@@ -40,8 +41,17 @@ def get_meta_attributes(image_file):
         "temperature": 0.5
     }
 
-    response = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
-    return response.json()
+    for attempt in range(max_retries):
+        try:
+            response = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
+            response.raise_for_status()  # Raises an HTTPError for bad responses
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            if attempt < max_retries - 1:  # if it's not the last attempt
+                time.sleep(2 ** attempt)  # exponential backoff
+                continue
+            else:
+                raise e
 
 def process_images_and_generate_excel(uploaded_files, progress_bar):
     wb = Workbook()
@@ -60,18 +70,9 @@ def process_images_and_generate_excel(uploaded_files, progress_bar):
             meta_attributes = get_meta_attributes(file)
             if 'choices' in meta_attributes and meta_attributes['choices']:
                 content = meta_attributes['choices'][0]['message']['content']
-                attributes = content.split('\n')
+                attributes = content.split(',')
 
-                attribute_values = [file.name]
-                for header in headers[1:]:
-                    found = False
-                    for attribute in attributes:
-                        if attribute.lower().startswith(header.lower()):
-                            attribute_values.append(attribute.split(':')[1].strip())
-                            found = True
-                            break
-                    if not found:
-                        attribute_values.append("")
+                attribute_values = [file.name] + [attr.strip() for attr in attributes]
 
                 if any(value.strip() for value in attribute_values[1:]):
                     ws.append(attribute_values)
