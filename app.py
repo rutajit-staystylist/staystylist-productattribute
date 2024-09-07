@@ -19,7 +19,7 @@ def get_meta_attributes(image_file, max_retries=3):
         "Authorization": f"Bearer {api_key}"
     }
     payload = {
-        "model": "gpt-4-vision-preview",
+        "model": "gpt-4o",
         "messages": [
             {
                 "role": "user",
